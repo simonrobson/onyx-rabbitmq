@@ -24,7 +24,7 @@
    :onyx.messaging/peer-port-range [40200 40260]
    :onyx.messaging/bind-addr "localhost"})
 
-(def env (onyx.api/start-env env-config))
+(def test-env (onyx.api/start-env env-config))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
@@ -105,4 +105,4 @@
 
 (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
+(onyx.api/shutdown-env test-env)
