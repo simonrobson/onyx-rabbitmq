@@ -4,6 +4,7 @@
             [taoensso.timbre :refer [info]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.plugin.rabbitmq-input]
+            [environ.core :refer [env]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -32,6 +33,18 @@
 
 (def batch-size 20)
 
+(def test-queue-name (or (env :test-queue-name) "test.queue"))
+
+(def rabbitmq-host (or (env :rabbitmq-host) "localhost"))
+
+(def rabbitmq-port (or (env :rabbitmq-port) "5671"))
+
+(def rabbitmq-key (or (env :rabbitmq-key) nil))
+
+(def rabbitmq-crt (or (env :rabbitmq-crt) nil))
+
+(def rabbitmq-ca-crt (or (env :rabbitmq-ca-crt) nil))
+
 (def catalog
   [{:onyx/name :in
     :onyx/plugin :onyx.plugin.rabbitmq-input/input
@@ -39,6 +52,12 @@
     :onyx/medium :rabbitmq
     :onyx/batch-size batch-size
     :onyx/max-peers 1
+    :rabbit/queue-name test-queue-name
+    :rabbit/host rabbitmq-host
+    :rabbit/port rabbitmq-port
+    :rabbit/key rabbitmq-key
+    :rabbit/crt rabbitmq-crt
+    :rabbit/ca-crt rabbitmq-ca-crt
     :onyx/doc "Documentation for your datasource"}
 
    {:onyx/name :out
