@@ -1,4 +1,6 @@
 onyx.log
 target/*
 .nrepl-port
+.lein-env
+.lein-failures
 profiles.clj
