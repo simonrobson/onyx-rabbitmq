@@ -3,7 +3,8 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.static.default-vals :refer [defaults arg-or-default]]
             [onyx.types :as t]
-            [taoensso.timbre :refer [debug info] :as timbre]))
+            [taoensso.timbre :refer [debug info] :as timbre]
+            [onyx.plugin.rabbit :as rmq]))
 
 ;; Often you will need some data in your event map for use by the plugin
 ;; or other lifecycle functions. Try to place these in your builder function (pipeline)
@@ -18,9 +19,6 @@
     {:rabbitmq/pending-messages (:pending-messages pipeline)
      :rabbitmq/drained? (:drained? pipeline)
      :rabbitmq/example-datasource (:rabbitmq/example-datasource event)}))
-
-(def reader-calls
-  {:lifecycle/before-task-start inject-into-eventmap})
 
 (defn input-drained? [pending-messages batch]
   (and (= 1 (count @pending-messages))
@@ -99,3 +97,22 @@
         pending-messages (atom {})
         drained? (atom false)]
     (->ExampleInput max-pending batch-size batch-timeout pending-messages drained?)))
+
+(defn task-map->rabbit-params
+  [{:keys [rabbit/queue-name rabbit/host rabbit/port rabbit/key rabbit/crt rabbit/ca-crt]}]
+  {:queue-name queue-name
+   :host host :port (Integer/parseInt port)
+   :key key :crt crt :ca-crt ca-crt})
+
+(defn start-rabbit-consumer
+  [{:keys [onyx.core/task-map onyx.core/pipeline] :as event} lifecycle]
+  (let [ctx (rmq/start-consumer (task-map->rabbit-params task-map))]
+    {:rabbit/context ctx}))
+
+(defn stop-rabbit-connection
+  [{:keys [rabbit/context] :as event} lifecycle]
+  (rmq/stop context))
+
+(def reader-calls
+  {:lifecycle/before-task-start start-rabbit-consumer
+   :lifecycle/after-task-stop stop-rabbit-connection})

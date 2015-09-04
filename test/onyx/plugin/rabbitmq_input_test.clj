@@ -110,13 +110,13 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (take-segments! out-chan))
+(comment (def results (take-segments! out-chan))
 
-(deftest testing-output
-  (testing "Input is received at output"
-    (let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
-    (is (= expected (set (butlast results))))
-    (is (= :done (last results))))))
+         (deftest testing-output
+           (testing "Input is received at output"
+             (let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
+               (is (= expected (set (butlast results))))
+               (is (= :done (last results)))))))
 
 
 (doseq [v-peer v-peers]
