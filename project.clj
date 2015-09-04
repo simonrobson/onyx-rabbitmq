@@ -6,5 +6,6 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.onyxplatform/onyx "0.7.0"]
                  [environ "1.0.0"]]
+  :plugins [[lein-environ "1.0.0"]]
   :profiles {:dev {:dependencies []
-                   :plugins [[lein-environ "1.0.0"]]}})
+                   :plugins []}})
