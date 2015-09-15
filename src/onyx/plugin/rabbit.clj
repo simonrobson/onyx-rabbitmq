@@ -3,10 +3,21 @@
             [langohr.core :as rmq]
             [langohr.channel :as lch]
             [langohr.queue :as lq]
-            [langohr.consumers :as lc])
+            [langohr.consumers :as lc]
+            [langohr.basic :as lb]
+            [clojure.core.async :refer [>!! chan go-loop <!]]
+            [clojure.edn :as edn]
+            [taoensso.timbre :refer [debug info] :as timbre])
   (:import (java.io FileNotFoundException)
            (java.security.cert CertificateException)))
 
+(defn edn-serializer
+  [data]
+  (.getBytes (prn-str data)))
+
+(defn edn-deserializer
+  [bytes]
+  (edn/read-string (String. bytes)))
 
 (defn create-ssl-context
   "Returns an SSL context for use when initiating an SSL connection.
@@ -37,23 +48,44 @@
           :queue-name :key :crt :ca-crt))
 
 (defn message-handler
-  [ch {:keys [content-type delivery-tag type] :as meta} ^bytes payload]
-  (println (format "[consumer] Received a message: %s, delivery tag: %d, content type: %s, type: %s"
-                   (String. payload "UTF-8") delivery-tag content-type type)))
+  [write-to-chan deserialize-fn]
+  (fn
+    [ch {:keys [content-type delivery-tag type] :as meta} ^bytes payload]
+    (>!! write-to-chan {:payload (deserialize-fn payload) :delivery-tag delivery-tag})))
 
 (defn start-consumer
-  [params]
+  [params deserialize-fn write-to-ch]
   (let [conn   (rmq/connect (params->config params))
         ch     (lch/open conn)
-        qname  (:queue-name params)
-        _      (lq/declare ch qname {:exclusive false :auto-delete true})]
-    (prn "Subscribing to " qname)
-    (lc/subscribe ch qname message-handler {:auto-ack true})
+        qname  (:queue-name params)]
+    (info "Starting consumer on queue"  qname)
+    (lq/declare ch qname {:exclusive false :auto-delete false})
+    (lc/subscribe ch qname (message-handler write-to-ch deserialize-fn) {:auto-ack false})
     {:conn conn :ch ch}))
 
+(defn start-publisher
+  [params serialize-fn]
+  (let [write-ch (chan 2)
+        conn   (rmq/connect (params->config params))
+        ch     (lch/open conn)
+        qname  (:queue-name params)]
+    (lq/declare ch qname {:exclusive false :auto-delete false})
+    (go-loop []
+      (let [msg (<! write-ch)]
+        (lb/publish ch "" qname (serialize-fn msg))
+        (recur)))
+    {:conn conn :ch ch :write-ch write-ch}))
+
+(defn ack
+  [ch delivery-tag]
+  (lb/ack ch delivery-tag))
+
+(defn nack
+  [ch delivery-tag]
+  (lb/nack ch delivery-tag))
 
 (defn stop
   [{:keys [conn ch]}]
-  (prn "Closing rabbit connection")
+  (info "Closing rabbit connection")
   (rmq/close ch)
   (rmq/close conn))

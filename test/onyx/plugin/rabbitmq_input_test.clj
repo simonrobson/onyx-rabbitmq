@@ -3,11 +3,15 @@
             [clojure.test :refer [deftest is testing]]
             [taoensso.timbre :refer [info]]
             [onyx.plugin.core-async :refer [take-segments!]]
-            [onyx.plugin.rabbitmq-input]
+            [onyx.plugin.rabbitmq-input :as rmq-plugin]
+            [onyx.plugin.rabbit :as rmq]
+            [clojure.core.async :refer [>!!]]
             [environ.core :refer [env]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
+
+(taoensso.timbre/set-level! :debug)
 
 (def env-config
   {:onyx/id id
@@ -45,6 +49,10 @@
 
 (def rabbitmq-ca-crt (or (env :rabbitmq-ca-crt) nil))
 
+(def rabbitmq-serializer (or (env :rabbitmq-serializer) :onyx.plugin.rabbit/edn-serializer))
+
+(def rabbitmq-deserializer (or (env :rabbitmq-deserializer) :onyx.plugin.rabbit/edn-deserializer))
+
 (def catalog
   [{:onyx/name :in
     :onyx/plugin :onyx.plugin.rabbitmq-input/input
@@ -58,7 +66,8 @@
     :rabbit/key rabbitmq-key
     :rabbit/crt rabbitmq-crt
     :rabbit/ca-crt rabbitmq-ca-crt
-    :onyx/doc "Documentation for your datasource"}
+    :rabbit/deserializer rabbitmq-deserializer
+    :onyx/doc "Read segments from rabbitmq queue"}
 
    {:onyx/name :out
     :onyx/plugin :onyx.plugin.core-async/output
@@ -70,38 +79,31 @@
 
 (def workflow [[:in :out]])
 
-(def in-datasource (atom (list)))
-
 (def out-chan (chan (sliding-buffer (inc n-messages))))
-
-(defn inject-in-datasource [event lifecycle]
-  {:rabbitmq/example-datasource in-datasource})
 
 (defn inject-out-ch [event lifecycle]
   {:core.async/chan out-chan})
-
-(def in-calls
-  {:lifecycle/before-task-start inject-in-datasource})
 
 (def out-calls
   {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls ::in-calls}
-   {:lifecycle/task :in
     :lifecycle/calls :onyx.plugin.rabbitmq-input/reader-calls}
    {:lifecycle/task :out
     :lifecycle/calls ::out-calls}
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(doseq [n (range n-messages)]
-  (swap! in-datasource conj {:n n}))
+(let [serializer (rmq-plugin/resolve-keyword rabbitmq-serializer)
+      ctx (rmq/start-publisher (rmq-plugin/task-map->rabbit-params (first catalog)) serializer)
+      ch (:write-ch ctx)]
+  (doseq [n (range n-messages)]
+    (>!! ch {:n n}))
+  (>!! ch :done)
+  (rmq/stop ctx))
 
-(swap! in-datasource conj :done)
-
-(def v-peers (onyx.api/start-peers 2 peer-group))
+(def v-peers (onyx.api/start-peers 5 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -110,14 +112,13 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(comment (def results (take-segments! out-chan))
+(def results (take-segments! out-chan))
 
-         (deftest testing-output
-           (testing "Input is received at output"
-             (let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
-               (is (= expected (set (butlast results))))
-               (is (= :done (last results)))))))
-
+(deftest testing-output
+  (testing "Input is received at output"
+    (let [expected (set (map (fn [x] {:n x}) (range n-messages)))]
+      (is (= expected (set (butlast results))))
+      (is (= :done (last results))))))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
