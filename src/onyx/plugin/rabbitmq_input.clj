@@ -110,7 +110,7 @@
 (defn task-map->rabbit-params
   [{:keys [rabbit/queue-name rabbit/host rabbit/port rabbit/key rabbit/crt rabbit/ca-crt]}]
   {:queue-name queue-name
-   :host host :port (Integer/parseInt port)
+   :host host :port port
    :key key :crt crt :ca-crt ca-crt})
 
 (defn resolve-keyword
