@@ -59,7 +59,7 @@
         ch     (lch/open conn)
         qname  (:queue-name params)]
     (info "Starting consumer on queue"  qname)
-    (lq/declare ch qname {:exclusive false :auto-delete false})
+    (lq/declare ch qname {:exclusive false :durable true :auto-delete false})
     (lc/subscribe ch qname (message-handler write-to-ch deserialize-fn) {:auto-ack false})
     {:conn conn :ch ch}))
 
