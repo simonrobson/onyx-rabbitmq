@@ -80,9 +80,9 @@
   [ch delivery-tag]
   (lb/ack ch delivery-tag))
 
-(defn nack
+(defn requeue
   [ch delivery-tag]
-  (lb/nack ch delivery-tag))
+  (lb/reject ch delivery-tag true))
 
 (defn stop
   [{:keys [conn ch]}]
