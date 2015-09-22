@@ -41,7 +41,7 @@
 
 (def rabbitmq-host (or (env :rabbitmq-host) "localhost"))
 
-(def rabbitmq-port (or (env :rabbitmq-port) "5671"))
+(def rabbitmq-port (or (Integer/parseInt (env :rabbitmq-port)) 5671))
 
 (def rabbitmq-key (or (env :rabbitmq-key) nil))
 

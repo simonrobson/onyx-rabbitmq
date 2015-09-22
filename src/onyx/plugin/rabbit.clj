@@ -69,7 +69,7 @@
         conn   (rmq/connect (params->config params))
         ch     (lch/open conn)
         qname  (:queue-name params)]
-    (lq/declare ch qname {:exclusive false :auto-delete false})
+    (lq/declare ch qname {:exclusive false :durable true :auto-delete false})
     (go-loop []
       (let [msg (<! write-ch)]
         (lb/publish ch "" qname (serialize-fn msg))
