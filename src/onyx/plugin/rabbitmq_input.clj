@@ -70,7 +70,7 @@
     (swap! pending-messages dissoc segment-id))
 
   (retry-segment
-    [_ {:keys [rabbitmq/context] :as event} segment-id]
+    [_ {:keys [rabbit/context] :as event} segment-id]
     ;; Messages are retried if they are not acked in time
     ;; or if a message is forcibly retried by flow conditions.
     ;; Generally this takes place in two steps
