@@ -77,6 +77,7 @@
     ;; Take the message out of your pending-messages atom, and put it
     ;; back into a datasource or a buffer that are you are reading into
     (when-let [msg (get @pending-messages segment-id)]
+      (debug "Retrying segment" segment-id "with tag" (get @delivery-tags segment-id))
       (rmq/requeue (:ch context) (get @delivery-tags segment-id))
       (swap! pending-messages dissoc segment-id)
       (swap! delivery-tags dissoc segment-id)))
